@@ -1,0 +1,29 @@
+| Player           |   Line | Over | Under |
+| ---------------- | -----: | ---: | ----: |
+| Kyler Murray     | 2900.5 | -110 |  -110 |
+| Aaron Rodgers    | 3199.5 | -110 |  -110 |
+| Baker Mayfield   | 3599.5 | +100 |  -130 |
+| Bo Nix           | 3499.5 | -110 |  -110 |
+| Brock Purdy      | 3799.5 | -110 |  -110 |
+| Bryce Young      | 3074.5 | -110 |  -110 |
+| Caleb Williams   | 3599.5 | -110 |  -110 |
+| Cam Ward         | 3299.5 | -110 |  -110 |
+| CJ Stroud        | 3649.5 | -110 |  -110 |
+| Dak Prescott     | 3999.5 | -110 |  -110 |
+| Drake Maye       | 3799.5 | -110 |  -110 |
+| Fernando Mendoza | 2399.5 | -105 |  -115 |
+| Geno Smith       | 2574.5 | -110 |  -110 |
+| Jalen Hurts      | 3249.5 | -110 |  -110 |
+| Jared Goff       | 4099.5 | -110 |  -110 |
+| Jaxson Dart      | 3149.5 | -110 |  -110 |
+| Jayden Daniels   | 3399.5 | +100 |  -130 |
+| Joe Burrow       | 3999.5 | -110 |  -110 |
+| Jordan Love      | 3549.5 | -110 |  -110 |
+| Josh Allen       | 3600.5 | -110 |  -110 |
+| Justin Herbert   | 3599.5 | -110 |  -110 |
+| Lamar Jackson    | 3249.5 | -110 |  -110 |
+| Malik Willis     | 3249.5 | +125 |  -160 |
+| Matthew Stafford | 3999.5 | -110 |  -110 |
+| Sam Darnold      | 3749.5 | -105 |  -115 |
+| Trevor Lawrence  | 3774.5 | -110 |  -110 |
+| Tyler Shough     | 3649.5 | -110 |  -110 |

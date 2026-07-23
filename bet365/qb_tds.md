@@ -1,0 +1,29 @@
+| Player           | Line | Over | Under |
+| ---------------- | ---: | ---: | ----: |
+| Aaron Rodgers    | 20.5 | -115 |  -105 |
+| Baker Mayfield   | 25.5 | +100 |  -130 |
+| Bo Nix           | 24.5 | -105 |  -115 |
+| Brock Purdy      | 27.5 | -115 |  -105 |
+| Bryce Young      | 20.5 | -110 |  -110 |
+| Caleb Williams   | 24.5 | +100 |  -130 |
+| Cam Ward         | 18.5 | -110 |  -110 |
+| CJ Stroud        | 22.5 | +100 |  -130 |
+| Dak Prescott     | 27.5 | -105 |  -115 |
+| Drake Maye       | 26.5 | -105 |  -115 |
+| Fernando Mendoza | 12.5 | -115 |  -105 |
+| Geno Smith       | 14.5 | -105 |  -115 |
+| Jalen Hurts      | 22.5 | -110 |  -110 |
+| Jared Goff       | 29.5 | -110 |  -110 |
+| Jaxson Dart      | 19.5 | -115 |  -105 |
+| Jayden Daniels   | 21.5 | -105 |  -115 |
+| Joe Burrow       | 32.5 | -115 |  -105 |
+| Jordan Love      | 24.5 | -105 |  -115 |
+| Josh Allen       | 24.5 | -110 |  -110 |
+| Justin Herbert   | 24.5 | -115 |  -105 |
+| Kyler Murray     | 17.5 | -130 |  +100 |
+| Lamar Jackson    | 24.5 | -115 |  -105 |
+| Malik Willis     | 15.5 | +100 |  -130 |
+| Matthew Stafford | 30.5 | -105 |  -115 |
+| Sam Darnold      | 23.5 | -110 |  -110 |
+| Trevor Lawrence  | 25.5 | -110 |  -110 |
+| Tyler Shough     | 19.5 | -130 |  +100 |
