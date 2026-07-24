@@ -21,6 +21,12 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 WR_DIR = REPO_ROOT / "wr"
 PROPS_DIR = REPO_ROOT / "props"
+NAME_ALIASES = {
+    "cameronskattebo": "camskattebo",
+    "cameronward": "camward",
+    "chigoziemokonkwo": "chigokonkwo",
+    "jakeferguson20262027markets": "jakeferguson",
+}
 
 # Columns that describe 2025 outcomes inside the 2024 feature file. They are
 # join/evaluation data and must never be read as model features.
@@ -37,7 +43,8 @@ def norm_name(value):
     value = unicodedata.normalize("NFKD", str(value)).encode("ascii", "ignore").decode()
     value = re.sub(r"\([^)]*\)", "", value.lower())
     value = re.sub(r"\b(jr|sr|ii|iii|iv|v)\b", "", value)
-    return re.sub(r"[^a-z0-9]", "", value)
+    key = re.sub(r"[^a-z0-9]", "", value)
+    return NAME_ALIASES.get(key, key)
 
 
 def number(value):

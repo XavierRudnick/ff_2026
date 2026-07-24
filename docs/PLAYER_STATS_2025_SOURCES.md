@@ -1,9 +1,16 @@
 # 2025 player-stat sources and definitions
 
-`scrape_2025_player_stats.py` creates `rb_stats_2025.csv` and
-`wr_stats_2025.csv`. It keeps the first occurrence of every player in the
-existing `rb_stats.csv` and `wr_stats.csv`, preserving their order. This removes
-the old PFR `2TM`/team-split duplicate rows while retaining the same player set.
+`scripts/scrape_2025_player_stats.py` creates `rbs/rb_stats_2025.csv` and
+`wr/wr_stats_act_2025.csv`. It keeps the first occurrence of every player in
+the existing 2024 files, preserving their order, and then appends active 2025
+players who were absent from the prior-year universe in descending PPR order.
+This includes rookies and other newcomers while removing old PFR
+`2TM`/team-split duplicate rows.
+
+The merged `*_act_pred_2025.csv` files also retain upcoming 2026 RB/WR
+rookies who have a market in the unified props file but no 2025 NFL season.
+Those rows use `merge_status=prop_only`; their 2025 and 2024 fields remain
+blank rather than fabricating statistics.
 
 All results cover the 2025 NFL regular season only. `normalized_line` is blank
 by design.
@@ -46,5 +53,6 @@ by design.
 For a reproducible rerun:
 
 ```bash
-python scrape_2025_player_stats.py
+uv run --with pandas --with requests python scripts/scrape_2025_player_stats.py
+python scripts/merge_act_pred_stats.py
 ```

@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Build 2025 regular-season RB and WR player-feature CSVs.
 
-The player universe and ordering come from ``rb_stats.csv`` and
-``wr_stats.csv``.  Duplicate multi-team rows in those 2024 source tables are
-collapsed to one player row.  ``normalized_line`` is intentionally left blank.
+The existing 2024 player ordering is preserved, then active 2025 players who
+were not in those files (most notably rookies) are appended in descending PPR
+order. Duplicate multi-team rows in the 2024 source tables are collapsed to
+one player row. ``normalized_line`` is intentionally left blank.
 """
 
 from __future__ import annotations
@@ -23,7 +24,7 @@ import requests
 
 
 SEASON = 2025
-ROOT = Path(__file__).resolve().parent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 NFLVERSE = "https://github.com/nflverse/nflverse-data/releases/download"
 FFOPPORTUNITY = "https://github.com/ffverse/ffopportunity/releases/download/latest-data"
@@ -58,6 +59,7 @@ WR_COLUMNS = [
 # Source naming differences that do not disappear when suffixes/punctuation are
 # normalized.
 ALIASES = {
+    "cameronskattebo": "camskattebo",
     "joshpalmer": "joshuapalmer",
     "gabrieldavis": "gabedavis",
     "dwayneeskridge": "deeeskridge",
@@ -152,6 +154,49 @@ def load_player_universe(path: Path) -> list[dict[str, object]]:
             }
         )
     return players
+
+
+def add_active_players(
+    players: list[dict[str, object]],
+    stats: pd.DataFrame,
+    positions: set[str],
+) -> list[dict[str, object]]:
+    """Append active 2025 players absent from the prior-season universe."""
+    result = list(players)
+    seen = {str(player["key"]) for player in result}
+    candidates = []
+    for row in stats.to_dict("records"):
+        if (
+            str(row.get("position")) not in positions
+            or integer(row.get("games")) <= 0
+        ):
+            continue
+        name = row.get("player_display_name")
+        if name is None or pd.isna(name):
+            continue
+        key = normalize_name(name)
+        if not key or key in seen:
+            continue
+        candidates.append(row)
+        seen.add(key)
+
+    candidates.sort(
+        key=lambda row: (
+            -number(row.get("fantasy_points_ppr")),
+            str(row.get("player_display_name", "")).lower(),
+        )
+    )
+    for row in candidates:
+        name = str(row["player_display_name"]).strip()
+        result.append(
+            {
+                "key": normalize_name(name),
+                "name": name,
+                "prior_age": None,
+                "prior_team": canonical_team(row.get("recent_team")),
+            }
+        )
+    return result
 
 
 def keyed_records(
@@ -626,10 +671,20 @@ def build_wr_rows(players: list[dict], context: dict) -> list[dict[str, object]]
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--rb-input", type=Path, default=ROOT / "rb_stats.csv")
-    parser.add_argument("--wr-input", type=Path, default=ROOT / "wr_stats.csv")
-    parser.add_argument("--rb-output", type=Path, default=ROOT / "rb_stats_2025.csv")
-    parser.add_argument("--wr-output", type=Path, default=ROOT / "wr_stats_2025.csv")
+    parser.add_argument(
+        "--rb-input", type=Path, default=PROJECT_ROOT / "rbs" / "rb_stats.csv"
+    )
+    parser.add_argument(
+        "--wr-input", type=Path, default=PROJECT_ROOT / "wr" / "wr_stats_2024.csv"
+    )
+    parser.add_argument(
+        "--rb-output", type=Path, default=PROJECT_ROOT / "rbs" / "rb_stats_2025.csv"
+    )
+    parser.add_argument(
+        "--wr-output",
+        type=Path,
+        default=PROJECT_ROOT / "wr" / "wr_stats_act_2025.csv",
+    )
     parser.add_argument(
         "--cache-dir",
         type=Path,
@@ -660,6 +715,8 @@ def main() -> None:
         adv_rush = pd.read_csv(local["adv_rush"])
         adv_rec = pd.read_csv(local["adv_rec"])
         expected = pd.read_csv(local["expected"], low_memory=False)
+        rb_players = add_active_players(rb_players, stats, {"RB", "FB"})
+        wr_players = add_active_players(wr_players, stats, {"WR"})
 
         pbp_columns = [
             "season_type", "week", "game_id", "posteam", "play_type",

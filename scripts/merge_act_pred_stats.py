@@ -3,7 +3,9 @@
 
 Each output keeps the 2025 actuals and 2024 stats side by side, adds
 ``*_diff_2025_minus_2024`` columns for useful numeric stat comparisons, and
-keeps ``normalized_line`` labeled as the predicted value.
+keeps ``normalized_line`` labeled as the predicted value. Upcoming rookies
+who have 2026 RB/WR props but no 2025 NFL statistics are retained as
+``prop_only`` rows.
 """
 
 import csv
@@ -13,13 +15,17 @@ from collections import OrderedDict
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parent.parent
 
 POSITION_FILES = {
     "rb": {
-        "actual": "rb_stats_2025.csv",
-        "old": "rb_stats.csv",
-        "output": "rb_stats_act_pred_2025.csv",
+        "actual": "rbs/rb_stats_2025.csv",
+        "old": "rbs/rb_stats.csv",
+        "output": "rbs/rb_stats_act_pred_2025.csv",
+        "prop_only_players": (
+            "Jadarian Price",
+            "Jeremiyah Love",
+        ),
         "prop_markets": (
             "rushing_yards",
             "rushing_tds",
@@ -29,9 +35,18 @@ POSITION_FILES = {
         ),
     },
     "wr": {
-        "actual": "wr_stats_act_2025.csv",
-        "old": "wr_stats_pred_2025.csv",
-        "output": "wr_stats_act_pred_2025.csv",
+        "actual": "wr/wr_stats_act_2025.csv",
+        "old": "wr/wr_stats_2024.csv",
+        "output": "wr/wr_stats_act_pred_2025.csv",
+        "prop_only_players": (
+            "Carnell Tate",
+            "Denzel Boston",
+            "Germie Bernard",
+            "Jordyn Tyson",
+            "KC Concepcion",
+            "Makai Lemon",
+            "Omar Cooper Jr.",
+        ),
         "prop_markets": (
             "receiving_yards",
             "receptions",
@@ -40,7 +55,7 @@ POSITION_FILES = {
     },
 }
 
-SEASON_PROPS_FILE = "nfl_2026_season_props_unified_2026-07-19.csv"
+SEASON_PROPS_FILE = "props/nfl_2026_season_props_unified_2026-07-19.csv"
 ACTUAL_SUFFIX = "2025"
 OLD_SUFFIX = "2024"
 PREDICTED_COLUMNS = {"normalized_line"}
@@ -53,13 +68,20 @@ PROP_COLUMNS = {
     "receptions": "Bet_Line_Rec",
     "receiving_tds": "Bet_Line_Rec_TD",
 }
+NAME_ALIASES = {
+    "cameronskattebo": "camskattebo",
+    "cameronward": "camward",
+    "chigoziemokonkwo": "chigokonkwo",
+    "jakeferguson20262027markets": "jakeferguson",
+}
 
 
 def normalize_name(name):
     name = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode()
     name = re.sub(r"\([^)]*\)", "", name.lower())
     name = re.sub(r"\b(jr|sr|ii|iii|iv)\b", "", name)
-    return re.sub(r"[^a-z0-9]", "", name)
+    key = re.sub(r"[^a-z0-9]", "", name)
+    return NAME_ALIASES.get(key, key)
 
 
 def unique_headers(header):
@@ -168,14 +190,17 @@ def prop_column(market):
 
 def build_prop_lookup(rows):
     lookup = {}
+    names = {}
     for row in rows:
         player = row.get("player", "").strip()
         market = row.get("market", "").strip()
         if player and market:
-            lookup[(normalize_name(player), market)] = row.get(
+            key = normalize_name(player)
+            lookup[(key, market)] = row.get(
                 "bettable_line_nearest_half", ""
             )
-    return lookup
+            names.setdefault(key, player)
+    return lookup, names
 
 
 def build_output_header(columns, actual_columns, old_columns, diff_columns, prop_markets):
@@ -205,6 +230,7 @@ def build_output_rows(
     diff_columns,
     prop_markets,
     prop_lookup,
+    prop_names,
 ):
     output_rows = []
     for key in keys:
@@ -213,12 +239,15 @@ def build_output_rows(
         player = (
             (actual_row or {}).get("Player")
             or (old_row or {}).get("Player")
+            or prop_names.get(key)
             or key
         )
         if actual_row and old_row:
             status = "both"
         elif actual_row:
             status = "actual_only"
+        elif key in prop_names:
+            status = "prop_only"
         else:
             status = "old_only"
 
@@ -252,7 +281,7 @@ def merge_position(position, config):
     actual_header, actual_raw_rows = read_csv(ROOT / config["actual"])
     old_header, old_raw_rows = read_csv(ROOT / config["old"])
     _, prop_rows = read_csv(ROOT / SEASON_PROPS_FILE)
-    prop_lookup = build_prop_lookup(prop_rows)
+    prop_lookup, prop_names = build_prop_lookup(prop_rows)
     actual_rows, actual_duplicates = index_by_player(actual_raw_rows)
     old_rows, old_duplicates = index_by_player(old_raw_rows)
 
@@ -262,6 +291,11 @@ def merge_position(position, config):
 
     keys = list(actual_rows)
     keys.extend(key for key in old_rows if key not in actual_rows)
+    keys.extend(
+        key
+        for key in map(normalize_name, config["prop_only_players"])
+        if key not in actual_rows and key not in old_rows
+    )
     diff_columns = [
         column
         for column in columns
@@ -289,6 +323,7 @@ def merge_position(position, config):
         diff_columns,
         config["prop_markets"],
         prop_lookup,
+        prop_names,
     )
 
     output_path = ROOT / config["output"]
@@ -299,6 +334,7 @@ def merge_position(position, config):
 
     both = sum(row["merge_status"] == "both" for row in output_rows)
     actual_only = sum(row["merge_status"] == "actual_only" for row in output_rows)
+    prop_only = sum(row["merge_status"] == "prop_only" for row in output_rows)
     old_only = sum(row["merge_status"] == "old_only" for row in output_rows)
     ignored_split_rows = sum(note["ignored_rows"] for note in actual_duplicates + old_duplicates)
     return {
@@ -307,6 +343,7 @@ def merge_position(position, config):
         "rows": len(output_rows),
         "both": both,
         "actual_only": actual_only,
+        "prop_only": prop_only,
         "old_only": old_only,
         "diff_columns": len(diff_columns),
         "ignored_split_rows": ignored_split_rows,
@@ -318,7 +355,8 @@ def main():
     for summary in summaries:
         print(
             "{position}: wrote {output} with {rows} rows "
-            "({both} matched, {actual_only} actual-only, {old_only} 2024-only), "
+            "({both} matched, {actual_only} actual-only, {prop_only} prop-only, "
+            "{old_only} 2024-only), "
             "{diff_columns} diff columns; ignored {ignored_split_rows} split-team rows".format(
                 **summary
             )

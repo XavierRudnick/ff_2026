@@ -13,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 import backtest_wr_weights
 import build_wr_board
 import find_wr_sleepers
+import merge_act_pred_stats
 import wr_model
 from wr_model import (
     LEAKAGE_COLUMNS, average_ranks, check_weights, clean_share,
@@ -107,6 +108,14 @@ class TestNameMatching(unittest.TestCase):
         self.assertEqual(norm_name("José Ramírez"), "joseramirez")
         self.assertEqual(norm_name("KaVontae Turpin (KR)"), "kavontaeturpin")
 
+    def test_props_name_aliases(self):
+        self.assertEqual(norm_name("Cameron Skattebo"), norm_name("Cam Skattebo"))
+        self.assertEqual(norm_name("Cameron Ward"), norm_name("Cam Ward"))
+        self.assertEqual(
+            norm_name("Jake Ferguson 2026/2027 Markets"),
+            norm_name("Jake Ferguson"),
+        )
+
     def test_dedupe_prefers_aggregate_multi_team_row(self):
         rows = [
             {"Player": "Traded Guy", "Team": "CAR", "G": "7"},
@@ -128,14 +137,50 @@ class TestNameMatching(unittest.TestCase):
         self.assertEqual(left_only, ["leftonly"])
         self.assertEqual(right_only, ["rightonly"])
 
-    def test_real_files_join_cleanly(self):
+    def test_real_files_keep_prior_players_and_include_2025_newcomers(self):
         rows_2024, _ = dedupe_players(
             wr_model.read_rows(wr_model.WR_DIR / "wr_stats_2024.csv"))
         rows_2025 = wr_model.read_rows(
             wr_model.WR_DIR / "wr_stats_act_2025.csv")
         left_only, right_only = match_report(rows_2024, rows_2025)
         self.assertEqual(left_only, [])
-        self.assertEqual(right_only, [])
+        self.assertTrue(
+            {"lutherburden", "tetairoamcmillan", "emekaegbuka"}.issubset(
+                set(right_only)
+            )
+        )
+
+    def test_requested_newcomers_are_in_actual_prediction_merges(self):
+        rb_rows = wr_model.read_rows(
+            wr_model.REPO_ROOT / "rbs" / "rb_stats_act_pred_2025.csv")
+        wr_rows = wr_model.read_rows(
+            wr_model.WR_DIR / "wr_stats_act_pred_2025.csv")
+        rb = {norm_name(row["Player"]): row for row in rb_rows}
+        wr = {norm_name(row["Player"]): row for row in wr_rows}
+        self.assertEqual(rb["omarionhampton"]["merge_status"], "actual_only")
+        self.assertEqual(wr["lutherburden"]["merge_status"], "actual_only")
+        self.assertGreater(number(rb["omarionhampton"]["FPTS_2025"]), 0)
+        self.assertGreater(number(wr["lutherburden"]["FPTS_2025"]), 0)
+
+    def test_2026_rb_wr_props_only_players_are_in_merges(self):
+        paths = {
+            "rb": wr_model.REPO_ROOT / "rbs" / "rb_stats_act_pred_2025.csv",
+            "wr": wr_model.WR_DIR / "wr_stats_act_pred_2025.csv",
+        }
+        for position, path in paths.items():
+            rows = {
+                norm_name(row["Player"]): row
+                for row in wr_model.read_rows(path)
+            }
+            config = merge_act_pred_stats.POSITION_FILES[position]
+            line_fields = [
+                merge_act_pred_stats.prop_column(market)
+                for market in config["prop_markets"]
+            ]
+            for player in config["prop_only_players"]:
+                row = rows[norm_name(player)]
+                self.assertEqual(row["merge_status"], "prop_only")
+                self.assertTrue(any(number(row.get(field)) for field in line_fields))
 
 
 class TestMissingData(unittest.TestCase):
