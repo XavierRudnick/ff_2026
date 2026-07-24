@@ -182,6 +182,28 @@ class TestNameMatching(unittest.TestCase):
                 self.assertEqual(row["merge_status"], "prop_only")
                 self.assertTrue(any(number(row.get(field)) for field in line_fields))
 
+    def test_tes_are_in_pass_catcher_merge_with_prop_lines(self):
+        rows = {
+            norm_name(row["Player"]): row
+            for row in wr_model.read_rows(
+                wr_model.WR_DIR / "wr_stats_act_pred_2025.csv"
+            )
+        }
+        expected_lines = {
+            "Brock Bowers": ("Bet_Line_Rec_Yds", "Bet_Line_Rec_TD"),
+            "Trey McBride": ("Bet_Line_Rec_Yds", "Bet_Line_Rec_TD"),
+            "Travis Kelce": ("Bet_Line_Rec_Yds",),
+        }
+        for player, line_fields in expected_lines.items():
+            row = rows[norm_name(player)]
+            self.assertEqual(row["Position_2025"], "TE")
+            self.assertGreater(number(row["FPTS_2025"]), 0)
+            self.assertTrue(all(number(row[field]) for field in line_fields))
+
+        rookie = rows[norm_name("Kenyon Sadiq")]
+        self.assertEqual(rookie["merge_status"], "prop_only")
+        self.assertTrue(number(rookie["Bet_Line_Rec_Yds"]))
+
 
 class TestMissingData(unittest.TestCase):
     def test_number_parsing(self):

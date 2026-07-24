@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""Build 2025 regular-season RB and WR player-feature CSVs.
+"""Build 2025 regular-season RB and pass-catcher player-feature CSVs.
 
 The existing 2024 player ordering is preserved, then active 2025 players who
 were not in those files (most notably rookies) are appended in descending PPR
-order. Duplicate multi-team rows in the 2024 source tables are collapsed to
-one player row. ``normalized_line`` is intentionally left blank.
+order. The pass-catcher output combines WRs with the locally ranked TE
+universe and all other active 2025 TEs. Duplicate multi-team rows in the 2024
+source tables are collapsed to one player row. ``normalized_line`` is
+intentionally left blank.
 """
 
 from __future__ import annotations
@@ -49,12 +51,32 @@ RB_COLUMNS = [
 ]
 
 WR_COLUMNS = [
-    "Player", "Age", "Team", "G", "Tgt", "Rec", "Yds", "Target_Share",
-    "CATCHABLE", "AIR", "team_air", "air_pct", "RZ TGT", "RZ_REC",
-    "RZ_REC_PCT", "RZ_P_TD", "RZ_TGT_PCT", "Routes Run", "FPTS",
-    "FPTS/G", "XFP", "fpts_diff", "RTD", "TD/G", "XTD", "td_diff",
-    "WOPR", "VOR", "YPRR", "normalized_line", "TGT/G",
+    "Player", "Position", "Age", "Team", "G", "Tgt", "Rec", "Yds",
+    "Target_Share", "CATCHABLE", "AIR", "team_air", "air_pct", "RZ TGT",
+    "RZ_REC", "RZ_REC_PCT", "RZ_P_TD", "RZ_TGT_PCT", "Routes Run",
+    "FPTS", "FPTS/G", "XFP", "fpts_diff", "RTD", "TD/G", "XTD",
+    "td_diff", "WOPR", "VOR", "YPRR", "normalized_line", "TGT/G",
 ]
+
+# Canonical display names for shorthand and misspellings in te/te_rank2025.csv.
+TE_DISPLAY_ALIASES = {
+    "broccolibowers": "Brock Bowers",
+    "treymcbride": "Trey McBride",
+    "georgerkittle": "George Kittle",
+    "jonnu": "Jonnu Smith",
+    "thock": "T.J. Hockenson",
+    "laporta": "Sam LaPorta",
+    "travis": "Travis Kelce",
+    "isaihalikely": "Isaiah Likely",
+    "dallasgogurt": "Dallas Goedert",
+    "willdiselly": "Will Dissly",
+    "njoku": "David Njoku",
+    "jakefergusun": "Jake Ferguson",
+    "mikegesiki": "Mike Gesicki",
+    "conklin": "Tyler Conklin",
+    "juwan": "Juwan Johnson",
+    "patfriermoth": "Pat Freiermuth",
+}
 
 # Source naming differences that do not disappear when suffixes/punctuation are
 # normalized.
@@ -66,6 +88,10 @@ ALIASES = {
     "scottmiller": "scottymiller",
     "kennethgainwell": "kennygainwell",
     "patricktaylor": "patricktaylorjr",
+    **{
+        alias: re.sub(r"[^a-z0-9]", "", canonical.lower())
+        for alias, canonical in TE_DISPLAY_ALIASES.items()
+    },
 }
 
 PFR_TEAM = {
@@ -134,21 +160,27 @@ def download(session: requests.Session, url: str, destination: Path) -> Path:
     return destination
 
 
-def load_player_universe(path: Path) -> list[dict[str, object]]:
+def load_player_universe(
+    path: Path, default_position: str | None = None
+) -> list[dict[str, object]]:
     frame = pd.read_csv(path)
     if "Player" not in frame:
         raise ValueError(f"{path.name} has no Player column")
     players: list[dict[str, object]] = []
     seen: set[str] = set()
     for row in frame.to_dict("records"):
-        key = normalize_name(row["Player"])
+        raw_name = str(row["Player"]).strip()
+        raw_key = re.sub(r"[^a-z0-9]", "", raw_name.lower())
+        name = TE_DISPLAY_ALIASES.get(raw_key, raw_name)
+        key = normalize_name(name)
         if not key or key in seen:
             continue
         seen.add(key)
         players.append(
             {
                 "key": key,
-                "name": str(row["Player"]).strip(),
+                "name": name,
+                "position": default_position,
                 "prior_age": integer(row.get("Age")) if is_number(row.get("Age")) else None,
                 "prior_team": str(row.get("Team", "")).strip(),
             }
@@ -192,6 +224,7 @@ def add_active_players(
             {
                 "key": normalize_name(name),
                 "name": name,
+                "position": str(row.get("position") or ""),
                 "prior_age": None,
                 "prior_team": canonical_team(row.get("recent_team")),
             }
@@ -586,7 +619,12 @@ def build_wr_rows(players: list[dict], context: dict) -> list[dict[str, object]]
         )
         recent_team = canonical_team(stat.get("recent_team") or (roster or {}).get("team"))
         teams = teams_for(player_id, recent_team, context["pbp"])
-        position = str(stat.get("position") or (roster or {}).get("position") or "WR")
+        position = str(
+            stat.get("position")
+            or (roster or {}).get("position")
+            or player.get("position")
+            or "WR"
+        )
         position_group = "TE" if position == "TE" else "WR"
 
         adv = select_by_id_or_name(
@@ -634,6 +672,7 @@ def build_wr_rows(players: list[dict], context: dict) -> list[dict[str, object]]
 
         row = {
             "Player": player["name"],
+            "Position": position_group,
             "Age": age_for(roster, player["prior_age"]),
             "Team": team_label(teams, recent_team),
             "G": games,
@@ -678,6 +717,9 @@ def main() -> None:
         "--wr-input", type=Path, default=PROJECT_ROOT / "wr" / "wr_stats_2024.csv"
     )
     parser.add_argument(
+        "--te-input", type=Path, default=PROJECT_ROOT / "te" / "te_rank2025.csv"
+    )
+    parser.add_argument(
         "--rb-output", type=Path, default=PROJECT_ROOT / "rbs" / "rb_stats_2025.csv"
     )
     parser.add_argument(
@@ -693,7 +735,8 @@ def main() -> None:
     args = parser.parse_args()
 
     rb_players = load_player_universe(args.rb_input)
-    wr_players = load_player_universe(args.wr_input)
+    wr_players = load_player_universe(args.wr_input, default_position="WR")
+    te_players = load_player_universe(args.te_input, default_position="TE")
     session = requests.Session()
     session.headers.update({"User-Agent": "ff-2026-player-stats/1.0"})
 
@@ -717,6 +760,13 @@ def main() -> None:
         expected = pd.read_csv(local["expected"], low_memory=False)
         rb_players = add_active_players(rb_players, stats, {"RB", "FB"})
         wr_players = add_active_players(wr_players, stats, {"WR"})
+        te_players = add_active_players(te_players, stats, {"TE"})
+        wr_keys = {player["key"] for player in wr_players}
+        pass_catchers = wr_players + [
+            player
+            for player in te_players
+            if player["key"] not in wr_keys
+        ]
 
         pbp_columns = [
             "season_type", "week", "game_id", "posteam", "play_type",
@@ -748,7 +798,7 @@ def main() -> None:
         )
         sumer = build_sumer_index(session)
         add_pff_route_fallbacks(
-            session, wr_players, stats_wr_name, roster_id, roster_name, sumer
+            session, pass_catchers, stats_wr_name, roster_id, roster_name, sumer
         )
         context = {
             "stats_rb_name": stats_rb_name,
@@ -766,19 +816,25 @@ def main() -> None:
         }
 
         rb_rows = build_rb_rows(rb_players, context)
-        wr_rows = build_wr_rows(wr_players, context)
+        wr_rows = build_wr_rows(pass_catchers, context)
         args.rb_output.parent.mkdir(parents=True, exist_ok=True)
         args.wr_output.parent.mkdir(parents=True, exist_ok=True)
         pd.DataFrame(rb_rows, columns=RB_COLUMNS).to_csv(args.rb_output, index=False)
         pd.DataFrame(wr_rows, columns=WR_COLUMNS).to_csv(args.wr_output, index=False)
 
         rb_active = sum(row["G"] > 0 for row in rb_rows)
-        wr_active = sum(row["G"] > 0 for row in wr_rows)
+        wr_active = sum(
+            row["G"] > 0 and row["Position"] == "WR" for row in wr_rows
+        )
+        te_active = sum(
+            row["G"] > 0 and row["Position"] == "TE" for row in wr_rows
+        )
         print(
             f"Wrote {len(rb_rows)} RBs ({rb_active} with 2025 games) to {args.rb_output}"
         )
         print(
-            f"Wrote {len(wr_rows)} WRs ({wr_active} with 2025 games) to {args.wr_output}"
+            f"Wrote {len(wr_rows)} pass catchers "
+            f"({wr_active} active WR, {te_active} active TE) to {args.wr_output}"
         )
     finally:
         if temporary is not None:

@@ -1,16 +1,19 @@
 # 2025 player-stat sources and definitions
 
 `scripts/scrape_2025_player_stats.py` creates `rbs/rb_stats_2025.csv` and
-`wr/wr_stats_act_2025.csv`. It keeps the first occurrence of every player in
-the existing 2024 files, preserving their order, and then appends active 2025
-players who were absent from the prior-year universe in descending PPR order.
-This includes rookies and other newcomers while removing old PFR
-`2TM`/team-split duplicate rows.
+`wr/wr_stats_act_2025.csv`. The latter is a combined pass-catcher table: it
+keeps the WRs from the existing 2024 file, adds the players in
+`te/te_rank2025.csv`, and appends all other active 2025 WRs and TEs in
+descending PPR order. Canonical names replace shorthand and misspellings from
+the manual TE ranking file. This includes rookies and other newcomers while
+removing old PFR `2TM`/team-split duplicate rows.
 
-The merged `*_act_pred_2025.csv` files also retain upcoming 2026 RB/WR
+The merged `*_act_pred_2025.csv` files also retain upcoming 2026 RB/WR/TE
 rookies who have a market in the unified props file but no 2025 NFL season.
 Those rows use `merge_status=prop_only`; their 2025 and 2024 fields remain
-blank rather than fabricating statistics.
+blank rather than fabricating statistics. The pass-catcher output identifies
+actual players with `Position_2025` and gives WRs and TEs the same receiving
+yards, receptions, and receiving-TD prop columns.
 
 All results cover the 2025 NFL regular season only. `normalized_line` is blank
 by design.

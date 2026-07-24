@@ -4,7 +4,7 @@
 Each output keeps the 2025 actuals and 2024 stats side by side, adds
 ``*_diff_2025_minus_2024`` columns for useful numeric stat comparisons, and
 keeps ``normalized_line`` labeled as the predicted value. Upcoming rookies
-who have 2026 RB/WR props but no 2025 NFL statistics are retained as
+who have 2026 RB/WR/TE props but no 2025 NFL statistics are retained as
 ``prop_only`` rows.
 """
 
@@ -46,6 +46,7 @@ POSITION_FILES = {
             "KC Concepcion",
             "Makai Lemon",
             "Omar Cooper Jr.",
+            "Kenyon Sadiq",
         ),
         "prop_markets": (
             "receiving_yards",
