@@ -20,19 +20,39 @@ POSITION_FILES = {
         "actual": "rb_stats_2025.csv",
         "old": "rb_stats.csv",
         "output": "rb_stats_act_pred_2025.csv",
+        "prop_markets": (
+            "rushing_yards",
+            "rushing_tds",
+            "receiving_yards",
+            "receptions",
+            "receiving_tds",
+        ),
     },
     "wr": {
         "actual": "wr_stats_act_2025.csv",
         "old": "wr_stats_pred_2025.csv",
         "output": "wr_stats_act_pred_2025.csv",
+        "prop_markets": (
+            "receiving_yards",
+            "receptions",
+            "receiving_tds",
+        ),
     },
 }
 
+SEASON_PROPS_FILE = "nfl_2026_season_props_unified_2026-07-19.csv"
 ACTUAL_SUFFIX = "2025"
 OLD_SUFFIX = "2024"
 PREDICTED_COLUMNS = {"normalized_line"}
 SKIP_COLUMNS = {"", "_index", "Unnamed: 0", "PPR_Points_2025", "rank"}
 NO_DIFF_COLUMNS = {"Age"}
+PROP_COLUMNS = {
+    "rushing_yards": "Bet_Line_Rush_Yds",
+    "rushing_tds": "Bet_Line_Rush_TD",
+    "receiving_yards": "Bet_Line_Rec_Yds",
+    "receptions": "Bet_Line_Rec",
+    "receiving_tds": "Bet_Line_Rec_TD",
+}
 
 
 def normalize_name(name):
@@ -142,12 +162,29 @@ def index_by_player(rows):
     return indexed, duplicate_notes
 
 
-def build_output_header(columns, actual_columns, old_columns, diff_columns):
+def prop_column(market):
+    return PROP_COLUMNS[market]
+
+
+def build_prop_lookup(rows):
+    lookup = {}
+    for row in rows:
+        player = row.get("player", "").strip()
+        market = row.get("market", "").strip()
+        if player and market:
+            lookup[(normalize_name(player), market)] = row.get(
+                "bettable_line_nearest_half", ""
+            )
+    return lookup
+
+
+def build_output_header(columns, actual_columns, old_columns, diff_columns, prop_markets):
     header = ["Player", "merge_status"]
     for column in columns:
         if column in PREDICTED_COLUMNS:
             if column in old_columns:
                 header.append(f"{column}_pred")
+                header.extend(prop_column(market) for market in prop_markets)
             continue
         if column in actual_columns:
             header.append(f"{column}_{ACTUAL_SUFFIX}")
@@ -158,7 +195,17 @@ def build_output_header(columns, actual_columns, old_columns, diff_columns):
     return header
 
 
-def build_output_rows(keys, columns, actual_rows, old_rows, actual_columns, old_columns, diff_columns):
+def build_output_rows(
+    keys,
+    columns,
+    actual_rows,
+    old_rows,
+    actual_columns,
+    old_columns,
+    diff_columns,
+    prop_markets,
+    prop_lookup,
+):
     output_rows = []
     for key in keys:
         actual_row = actual_rows.get(key)
@@ -180,6 +227,10 @@ def build_output_rows(keys, columns, actual_rows, old_rows, actual_columns, old_
             if column in PREDICTED_COLUMNS:
                 if column in old_columns:
                     output_row[f"{column}_pred"] = (old_row or {}).get(column, "")
+                    for market in prop_markets:
+                        output_row[prop_column(market)] = prop_lookup.get(
+                            (key, market), ""
+                        )
                 continue
             if column in actual_columns:
                 output_row[f"{column}_{ACTUAL_SUFFIX}"] = (actual_row or {}).get(column, "")
@@ -200,6 +251,8 @@ def build_output_rows(keys, columns, actual_rows, old_rows, actual_columns, old_
 def merge_position(position, config):
     actual_header, actual_raw_rows = read_csv(ROOT / config["actual"])
     old_header, old_raw_rows = read_csv(ROOT / config["old"])
+    _, prop_rows = read_csv(ROOT / SEASON_PROPS_FILE)
+    prop_lookup = build_prop_lookup(prop_rows)
     actual_rows, actual_duplicates = index_by_player(actual_raw_rows)
     old_rows, old_duplicates = index_by_player(old_raw_rows)
 
@@ -219,7 +272,13 @@ def merge_position(position, config):
         and is_numeric_column(column, keys, actual_rows, old_rows)
     ]
 
-    output_header = build_output_header(columns, actual_columns, old_columns, diff_columns)
+    output_header = build_output_header(
+        columns,
+        actual_columns,
+        old_columns,
+        diff_columns,
+        config["prop_markets"],
+    )
     output_rows = build_output_rows(
         keys,
         columns,
@@ -228,6 +287,8 @@ def merge_position(position, config):
         actual_columns,
         old_columns,
         diff_columns,
+        config["prop_markets"],
+        prop_lookup,
     )
 
     output_path = ROOT / config["output"]

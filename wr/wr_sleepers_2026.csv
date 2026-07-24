@@ -1,0 +1,16 @@
+rank,Player,Team,Age,G_2025,upside_score,risk,confidence,prop_receiving_yards,prop_receptions,prop_receiving_tds,FPTS_G_2025,YPRR_2025,air_minus_target_share,routes_per_game,reasons
+1,rome odunze,CHI,23.0,12.0,88.9,LOW,100,796.0,,6.0,12.2,1.59,8.4,34.6,age 23; 1.59 YPRR (pct 79); air share +8.4 pts above target share; -2.2 PPG under expected (positive regression); 35 routes/game
+2,brian thomas,JAX,23.0,14.0,88.1,LOW,100,711.5,,4.0,9.9,1.5,10.3,33.6,age 23; 1.50 YPRR (pct 74); air share +10.3 pts above target share; -2.3 PPG under expected (positive regression); 34 routes/game
+3,marvin harrison,ARI,23.0,12.0,83.2,LOW,100,823.0,,5.0,10.7,1.58,8.5,32.1,age 23; 1.58 YPRR (pct 78); air share +8.5 pts above target share; 32 routes/game
+4,troy franklin,DEN,22.0,17.0,83.1,MEDIUM,80,,,,10.4,1.44,11.6,28.9,age 22; 1.44 YPRR (pct 69); air share +11.6 pts above target share; -1.0 PPG under expected (positive regression); 29 routes/game; no 2026 market line yet (market unknown)
+5,xavier worthy,KAN,22.0,14.0,80.9,LOW,100,644.5,,4.0,7.9,1.25,7.5,30.3,age 22; air share +7.5 pts above target share; -1.7 PPG under expected (positive regression); 30 routes/game
+6,jordan addison,MIN,23.0,14.0,79.3,LOW,100,656.0,,4.0,9.7,1.36,11.9,32.1,age 23; air share +11.9 pts above target share; 32 routes/game
+7,adonai mitchell,2TM,23.0,16.0,77.6,LOW,100,524.5,,,5.5,1.46,11.2,19.4,age 23; 1.46 YPRR (pct 70); air share +11.2 pts above target share; -1.8 PPG under expected (positive regression)
+8,ricky pearsall,SFO,25.0,9.0,77.6,LOW,88,675.0,,,9.8,1.84,7.8,31.9,age 25; 1.84 YPRR (pct 89); air share +7.8 pts above target share; 32 routes/game
+9,parker washington,JAX,23.0,16.0,75.8,LOW,100,750.0,,4.0,11.5,2.06,6.9,25.8,age 23; 2.06 YPRR (pct 95); air share +6.9 pts above target share
+10,alec pierce,IND,25.0,15.0,75.6,MEDIUM,80,,49.5,5.0,12.2,2.1,20.5,31.9,age 25; 2.10 YPRR (pct 96); air share +20.5 pts above target share; 32 routes/game; no 2026 market line yet (market unknown)
+11,keon coleman,BUF,22.0,12.0,74.4,MEDIUM,80,,,,8.5,1.27,5.9,26.4,age 22; air share +5.9 pts above target share; -1.0 PPG under expected (positive regression); 26 routes/game; no 2026 market line yet (market unknown)
+12,quentin johnston,LAC,24.0,13.0,71.2,LOW,100,642.0,,5.0,13.2,1.51,6.3,37.5,age 24; 1.51 YPRR (pct 75); air share +6.3 pts above target share; 37 routes/game
+13,jerry jeudy,CLE,26.0,17.0,70.8,LOW,100,619.0,,,7.1,1.02,13.7,34.9,air share +13.7 pts above target share; -2.2 PPG under expected (positive regression); 35 routes/game
+14,tre tucker,LVR,24.0,17.0,70.1,LOW,100,575.0,,,9.5,1.19,10.5,34.4,age 24; air share +10.5 pts above target share; 34 routes/game
+15,romeo doubs,GNB,25.0,16.0,69.6,LOW,100,635.0,56.5,5.0,10.3,1.73,6.8,26.2,age 25; 1.73 YPRR (pct 88); air share +6.8 pts above target share
