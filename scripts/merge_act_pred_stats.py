@@ -4,8 +4,13 @@
 Each output keeps the 2025 actuals and 2024 stats side by side, adds
 ``*_diff_2025_minus_2024`` columns for useful numeric stat comparisons, and
 keeps ``normalized_line`` labeled as the predicted value. Upcoming rookies
-who have 2026 RB/WR/TE props but no 2025 NFL statistics are retained as
-``prop_only`` rows.
+who have 2026 RB/WR/TE props but no 2025 NFL statistics are also retained.
+
+The output annualizes each player's 2025 targets over a 17-game season so
+injury-shortened seasons are not mistaken for low-volume seasons. It also
+calculates a market-based full-PPR estimate. A posted reception line is used
+for the catch component when available; otherwise the player's 2025
+receptions per game are annualized over 17 games.
 """
 
 import csv
@@ -62,6 +67,18 @@ OLD_SUFFIX = "2024"
 PREDICTED_COLUMNS = {"normalized_line"}
 SKIP_COLUMNS = {"", "_index", "Unnamed: 0", "PPR_Points_2025", "rank"}
 NO_DIFF_COLUMNS = {"Age"}
+OLD_COLUMNS_TO_REMOVE = {"Age"}
+DERIVED_COLUMNS = {
+    "rb": (
+        "Total_Targets",
+        "Expected_Receiving_Yards",
+        "Expected_Receptions",
+        "Expected_Receiving_TDs",
+        "Expected_Fantasy_Points_PPR",
+    ),
+    "wr": ("Total_Targets", "Expected_Fantasy_Points_PPR"),
+}
+SEASON_GAMES = 17
 PROP_COLUMNS = {
     "rushing_yards": "Bet_Line_Rush_Yds",
     "rushing_tds": "Bet_Line_Rush_TD",
@@ -139,6 +156,93 @@ def format_number(value):
     return "0" if text == "-0" else text
 
 
+def total_targets(actual_row):
+    """Return 2025 target pace projected over a 17-game season."""
+    targets_per_game = parse_number((actual_row or {}).get("TGT/G", ""))
+    if targets_per_game is None:
+        targets = parse_number(
+            (actual_row or {}).get("TGT", "")
+            or (actual_row or {}).get("Tgt", "")
+        )
+        games = parse_number((actual_row or {}).get("G", ""))
+        if targets is None or games is None or games <= 0:
+            return None
+        targets_per_game = targets / games
+    return targets_per_game * SEASON_GAMES
+
+
+def annualized_stat(actual_row, column):
+    """Return a 2025 counting stat projected over a 17-game season."""
+    value = parse_number((actual_row or {}).get(column, ""))
+    games = parse_number((actual_row or {}).get("G", ""))
+    if value is None or games is None or games <= 0:
+        return None
+    return value / games * SEASON_GAMES
+
+
+def expected_rb_receiving_stats(actual_row, output_row):
+    """Use RB receiving props first, then annualized 2025 production."""
+    receiving_yards = parse_number(output_row.get("Bet_Line_Rec_Yds", ""))
+    if receiving_yards is None:
+        receiving_yards = annualized_stat(actual_row, "Rec YDS")
+
+    receptions = parse_number(output_row.get("Bet_Line_Rec", ""))
+    if receptions is None:
+        receptions = annualized_stat(actual_row, "REC")
+
+    receiving_tds = parse_number(output_row.get("Bet_Line_Rec_TD", ""))
+    if receiving_tds is None:
+        receiving_tds = annualized_stat(actual_row, "Rec TD")
+
+    return receiving_yards, receptions, receiving_tds
+
+
+def expected_ppr(
+    position,
+    output_row,
+    projected_receptions,
+    rb_receiving_stats=None,
+):
+    """Calculate projected full-PPR points from the available betting lines."""
+    if position == "wr":
+        receptions = parse_number(output_row.get("Bet_Line_Rec", ""))
+        if receptions is None:
+            receptions = projected_receptions
+        receiving_yards = parse_number(output_row.get("Bet_Line_Rec_Yds", ""))
+        receiving_tds = parse_number(output_row.get("Bet_Line_Rec_TD", ""))
+        if (
+            receptions is None
+            or receiving_yards is None
+            or receiving_tds is None
+        ):
+            return None
+        return receptions + receiving_yards / 10 + receiving_tds * 6
+
+    rushing_yards = parse_number(output_row.get("Bet_Line_Rush_Yds", ""))
+    rushing_tds = parse_number(output_row.get("Bet_Line_Rush_TD", ""))
+    if (
+        rushing_yards is None
+        or rushing_tds is None
+        or rb_receiving_stats is None
+    ):
+        return None
+
+    receiving_yards, receptions, receiving_tds = rb_receiving_stats
+    if (
+        receiving_yards is None
+        or receptions is None
+        or receiving_tds is None
+    ):
+        return None
+    return (
+        receptions
+        + rushing_yards / 10
+        + rushing_tds * 6
+        + receiving_yards / 10
+        + receiving_tds * 6
+    )
+
+
 def is_numeric_column(column, keys, actual_rows, old_rows):
     observed = False
     for key in keys:
@@ -204,8 +308,15 @@ def build_prop_lookup(rows):
     return lookup, names
 
 
-def build_output_header(columns, actual_columns, old_columns, diff_columns, prop_markets):
-    header = ["Player", "merge_status"]
+def build_output_header(
+    position,
+    columns,
+    actual_columns,
+    old_columns,
+    diff_columns,
+    prop_markets,
+):
+    header = ["Player"]
     for column in columns:
         if column in PREDICTED_COLUMNS:
             if column in old_columns:
@@ -214,14 +325,16 @@ def build_output_header(columns, actual_columns, old_columns, diff_columns, prop
             continue
         if column in actual_columns:
             header.append(f"{column}_{ACTUAL_SUFFIX}")
-        if column in old_columns:
+        if column in old_columns and column not in OLD_COLUMNS_TO_REMOVE:
             header.append(f"{column}_{OLD_SUFFIX}")
         if column in diff_columns:
             header.append(f"{column}_diff_{ACTUAL_SUFFIX}_minus_{OLD_SUFFIX}")
+    header.extend(DERIVED_COLUMNS[position])
     return header
 
 
 def build_output_rows(
+    position,
     keys,
     columns,
     actual_rows,
@@ -234,6 +347,12 @@ def build_output_rows(
     prop_names,
 ):
     output_rows = []
+    status_counts = {
+        "both": 0,
+        "actual_only": 0,
+        "prop_only": 0,
+        "old_only": 0,
+    }
     for key in keys:
         actual_row = actual_rows.get(key)
         old_row = old_rows.get(key)
@@ -251,8 +370,9 @@ def build_output_rows(
             status = "prop_only"
         else:
             status = "old_only"
+        status_counts[status] += 1
 
-        output_row = {"Player": player, "merge_status": status}
+        output_row = {"Player": player}
         for column in columns:
             if column in PREDICTED_COLUMNS:
                 if column in old_columns:
@@ -264,7 +384,7 @@ def build_output_rows(
                 continue
             if column in actual_columns:
                 output_row[f"{column}_{ACTUAL_SUFFIX}"] = (actual_row or {}).get(column, "")
-            if column in old_columns:
+            if column in old_columns and column not in OLD_COLUMNS_TO_REMOVE:
                 output_row[f"{column}_{OLD_SUFFIX}"] = (old_row or {}).get(column, "")
             if column in diff_columns:
                 actual_value = parse_number((actual_row or {}).get(column, ""))
@@ -274,8 +394,41 @@ def build_output_rows(
                     if actual_value is not None and old_value is not None
                     else ""
                 )
+        projected_targets = total_targets(actual_row)
+        projected_receptions = annualized_stat(
+            actual_row,
+            "REC" if position == "rb" else "Rec",
+        )
+        output_row["Total_Targets"] = (
+            format_number(projected_targets) if projected_targets is not None else ""
+        )
+        rb_receiving_stats = None
+        if position == "rb":
+            rb_receiving_stats = expected_rb_receiving_stats(
+                actual_row,
+                output_row,
+            )
+            receiving_yards, receptions, receiving_tds = rb_receiving_stats
+            output_row["Expected_Receiving_Yards"] = (
+                format_number(receiving_yards) if receiving_yards is not None else ""
+            )
+            output_row["Expected_Receptions"] = (
+                format_number(receptions) if receptions is not None else ""
+            )
+            output_row["Expected_Receiving_TDs"] = (
+                format_number(receiving_tds) if receiving_tds is not None else ""
+            )
+        projected_ppr = expected_ppr(
+            position,
+            output_row,
+            projected_receptions,
+            rb_receiving_stats,
+        )
+        output_row["Expected_Fantasy_Points_PPR"] = (
+            format_number(projected_ppr) if projected_ppr is not None else ""
+        )
         output_rows.append(output_row)
-    return output_rows
+    return output_rows, status_counts
 
 
 def merge_position(position, config):
@@ -308,13 +461,15 @@ def merge_position(position, config):
     ]
 
     output_header = build_output_header(
+        position,
         columns,
         actual_columns,
         old_columns,
         diff_columns,
         config["prop_markets"],
     )
-    output_rows = build_output_rows(
+    output_rows, status_counts = build_output_rows(
+        position,
         keys,
         columns,
         actual_rows,
@@ -329,23 +484,20 @@ def merge_position(position, config):
 
     output_path = ROOT / config["output"]
     with output_path.open("w", newline="", encoding="utf-8") as output_file:
-        writer = csv.DictWriter(output_file, fieldnames=output_header)
+        writer = csv.DictWriter(
+            output_file,
+            fieldnames=output_header,
+            lineterminator="\n",
+        )
         writer.writeheader()
         writer.writerows(output_rows)
 
-    both = sum(row["merge_status"] == "both" for row in output_rows)
-    actual_only = sum(row["merge_status"] == "actual_only" for row in output_rows)
-    prop_only = sum(row["merge_status"] == "prop_only" for row in output_rows)
-    old_only = sum(row["merge_status"] == "old_only" for row in output_rows)
     ignored_split_rows = sum(note["ignored_rows"] for note in actual_duplicates + old_duplicates)
     return {
         "position": position.upper(),
         "output": config["output"],
         "rows": len(output_rows),
-        "both": both,
-        "actual_only": actual_only,
-        "prop_only": prop_only,
-        "old_only": old_only,
+        **status_counts,
         "diff_columns": len(diff_columns),
         "ignored_split_rows": ignored_split_rows,
     }

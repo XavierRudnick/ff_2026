@@ -10,10 +10,10 @@ removing old PFR `2TM`/team-split duplicate rows.
 
 The merged `*_act_pred_2025.csv` files also retain upcoming 2026 RB/WR/TE
 rookies who have a market in the unified props file but no 2025 NFL season.
-Those rows use `merge_status=prop_only`; their 2025 and 2024 fields remain
-blank rather than fabricating statistics. The pass-catcher output identifies
-actual players with `Position_2025` and gives WRs and TEs the same receiving
-yards, receptions, and receiving-TD prop columns.
+Their 2025 and 2024 fields remain blank rather than fabricating statistics.
+The pass-catcher output identifies actual players with `Position_2025` and
+gives WRs and TEs the same receiving yards, receptions, and receiving-TD prop
+columns.
 
 All results cover the 2025 NFL regular season only. `normalized_line` is blank
 by design.
@@ -46,6 +46,20 @@ by design.
   RBs, WR for WRs, and TE for TEs.
 - `FPTS` is full-PPR scoring from nflverse. `FPTS/G`, `TD/G`, and `TGT/G` use
   games played.
+- `Total_Targets` annualizes the player's 2025 targets over 17 games. This
+  preserves the target pace of players whose season was shortened by injury.
+- `Expected_Fantasy_Points_PPR` uses 0.1 points per betting-line yard, six
+  points per betting-line touchdown, and one point per posted reception.
+  When a reception line is unavailable, 2025 receptions per game annualized
+  over 17 games supply the fallback. WR/TE estimates require receiving-yard
+  and receiving-TD lines. RB estimates require rushing-yard and rushing-TD
+  lines.
+- The RB output's `Expected_Receiving_Yards`, `Expected_Receptions`, and
+  `Expected_Receiving_TDs` prefer the corresponding 2026 prop. Missing
+  receiving-yard and receiving-TD props fall back to the matching 2025 stat
+  annualized over 17 games; missing reception props fall back to 2025
+  receptions per game annualized over 17 games. These expected receiving
+  values feed the RB PPR estimate.
 - `VOR` retains the baselines implied by the prior files: 11.5 PPR points/game
   for RB, 13.0 for WR, and 8.5 for TE.
 - `ALY` uses the public line-yards weighting (losses 120%, yards 0-4 at 100%,

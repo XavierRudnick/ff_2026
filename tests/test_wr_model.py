@@ -157,8 +157,8 @@ class TestNameMatching(unittest.TestCase):
             wr_model.WR_DIR / "wr_stats_act_pred_2025.csv")
         rb = {norm_name(row["Player"]): row for row in rb_rows}
         wr = {norm_name(row["Player"]): row for row in wr_rows}
-        self.assertEqual(rb["omarionhampton"]["merge_status"], "actual_only")
-        self.assertEqual(wr["lutherburden"]["merge_status"], "actual_only")
+        self.assertNotIn("merge_status", rb["omarionhampton"])
+        self.assertNotIn("merge_status", wr["lutherburden"])
         self.assertGreater(number(rb["omarionhampton"]["FPTS_2025"]), 0)
         self.assertGreater(number(wr["lutherburden"]["FPTS_2025"]), 0)
 
@@ -179,7 +179,7 @@ class TestNameMatching(unittest.TestCase):
             ]
             for player in config["prop_only_players"]:
                 row = rows[norm_name(player)]
-                self.assertEqual(row["merge_status"], "prop_only")
+                self.assertFalse(row["G_2025"])
                 self.assertTrue(any(number(row.get(field)) for field in line_fields))
 
     def test_tes_are_in_pass_catcher_merge_with_prop_lines(self):
@@ -201,8 +201,58 @@ class TestNameMatching(unittest.TestCase):
             self.assertTrue(all(number(row[field]) for field in line_fields))
 
         rookie = rows[norm_name("Kenyon Sadiq")]
-        self.assertEqual(rookie["merge_status"], "prop_only")
         self.assertTrue(number(rookie["Bet_Line_Rec_Yds"]))
+
+    def test_prediction_merges_have_annualized_targets_and_market_ppr(self):
+        paths = (
+            wr_model.REPO_ROOT / "rbs" / "rb_stats_act_pred_2025.csv",
+            wr_model.WR_DIR / "wr_stats_act_pred_2025.csv",
+        )
+        for path in paths:
+            rows = wr_model.read_rows(path)
+            self.assertNotIn("merge_status", rows[0])
+            self.assertNotIn("Age_2024", rows[0])
+            self.assertIn("Total_Targets", rows[0])
+            self.assertIn("Expected_Fantasy_Points_PPR", rows[0])
+
+        wr_rows = {
+            norm_name(row["Player"]): row
+            for row in wr_model.read_rows(paths[1])
+        }
+        rb_rows = {
+            norm_name(row["Player"]): row
+            for row in wr_model.read_rows(paths[0])
+        }
+        self.assertAlmostEqual(number(wr_rows["jamarrchase"]["Total_Targets"]), 196.52)
+        self.assertAlmostEqual(
+            number(wr_rows["jamarrchase"]["Expected_Fantasy_Points_PPR"]),
+            295.85,
+        )
+        self.assertAlmostEqual(
+            number(wr_rows["nicocollins"]["Expected_Fantasy_Points_PPR"]),
+            223.82,
+        )
+        self.assertAlmostEqual(
+            number(rb_rows["bijanrobinson"]["Expected_Fantasy_Points_PPR"]),
+            323.8,
+        )
+        derrick_henry = rb_rows["derrickhenry"]
+        self.assertAlmostEqual(
+            number(derrick_henry["Expected_Receiving_Yards"]),
+            150,
+        )
+        self.assertAlmostEqual(
+            number(derrick_henry["Expected_Receptions"]),
+            15,
+        )
+        self.assertAlmostEqual(
+            number(derrick_henry["Expected_Receiving_TDs"]),
+            0,
+        )
+        self.assertAlmostEqual(
+            number(derrick_henry["Expected_Fantasy_Points_PPR"]),
+            225.35,
+        )
 
 
 class TestMissingData(unittest.TestCase):
